@@ -1,5 +1,19 @@
 # Changelog 🪵
 
+## 0.1.4
+
+- Added support for custom decoration for suggestion items using the `suggestionDecoration` property.
+- Introduced custom scroll physics for the suggestion list using the `physics` property.
+- Modified `_overlayChild` to apply the new `suggestionDecoration` and `physics` properties.
+- Updated the constructor of `GooglePlacesAutoCompleteTextFormField` to accept the new properties.
+- Enhanced user experience with customizable decoration and scrolling behavior for suggestions.
+- Updated `.gitignore` to exclude additional build artifacts, generated files, and IDE-specific directories.
+
+#### Summary
+- **Added**: `suggestionDecoration` property to customize the decoration of suggestion items.
+- **Added**: `physics` property to customize the scroll physics of the suggestion list.
+- **Updated**: `.gitignore` file to include more patterns for build artifacts, generated files, and IDE-specific directories.
+
 ## 0.1.3
 
 * [Fix]: Removed the duplicate declaration of the fields `inputDecoration` and `decoration`, which were misleading. Now only the field `decoration` is available to assign a `InputDecoration`  to the `GooglePlacesAutoCompleteTextFormField`, following the `TextFormField` convention.
