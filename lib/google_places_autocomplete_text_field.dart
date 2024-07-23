@@ -2,15 +2,13 @@ library google_places_autocomplete_text_field;
 
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
-import 'package:rxdart/rxdart.dart';
-
 import 'package:google_places_autocomplete_text_field/model/place_details.dart';
 import 'package:google_places_autocomplete_text_field/model/prediction.dart';
+import 'package:rxdart/rxdart.dart';
 
 class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
   final String? initialValue;
@@ -74,6 +72,8 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
   final TextStyle? predictionsStyle;
   final OverlayContainer? overlayContainer;
   final String? proxyURL;
+  final Decoration? suggestionDecoration;
+  final ScrollPhysics? physics;
 
   const GooglePlacesAutoCompleteTextFormField({
     super.key,
@@ -89,6 +89,8 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
     this.predictionsStyle,
     this.overlayContainer,
     this.proxyURL,
+    this.suggestionDecoration,
+    this.physics,
 
     ////// DEFAULT TEXT FORM INPUTS
     this.initialValue,
@@ -147,8 +149,7 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
       _GooglePlacesAutoCompleteTextFormFieldState();
 }
 
-class _GooglePlacesAutoCompleteTextFormFieldState
-    extends State<GooglePlacesAutoCompleteTextFormField> {
+class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAutoCompleteTextFormField> {
   final subject = PublishSubject<String>();
   OverlayEntry? _overlayEntry;
   List<Prediction> allPredictions = [];
@@ -257,10 +258,11 @@ class _GooglePlacesAutoCompleteTextFormFieldState
         }
       }
     }
-    final response = await _dio.get(url);
 
+    final response = await _dio.get(url);
     final subscriptionResponse =
-        PlacesAutocompleteResponse.fromJson(response.data);
+    PlacesAutocompleteResponse.fromJson(response.data);
+
 
     if (text.isEmpty) {
       allPredictions.clear();
@@ -275,8 +277,9 @@ class _GooglePlacesAutoCompleteTextFormFieldState
     }
   }
 
-  Future<void> textChanged(String text) async => getLocation(text).then(
-        (_) {
+  Future<void> textChanged(String text) async =>
+      getLocation(text).then(
+            (_) {
           _overlayEntry = null;
           _overlayEntry = _createOverlayEntry();
           Overlay.of(context).insert(_overlayEntry!);
@@ -290,21 +293,22 @@ class _GooglePlacesAutoCompleteTextFormFieldState
       var offset = renderBox.localToGlobal(Offset.zero);
 
       return OverlayEntry(
-        builder: (context) => Positioned(
-          left: offset.dx,
-          top: size.height + offset.dy,
-          width: size.width,
-          child: CompositedTransformFollower(
-            showWhenUnlinked: false,
-            link: _layerLink,
-            offset: Offset(0.0, size.height + 5.0),
-            child: widget.overlayContainer?.call(_overlayChild) ??
-                Material(
-                  elevation: 1.0,
-                  child: _overlayChild,
-                ),
-          ),
-        ),
+        builder: (context) =>
+            Positioned(
+              left: offset.dx,
+              top: size.height + offset.dy,
+              width: size.width,
+              child: CompositedTransformFollower(
+                showWhenUnlinked: false,
+                link: _layerLink,
+                offset: Offset(0.0, size.height + 5.0),
+                child: widget.overlayContainer?.call(_overlayChild) ??
+                    Material(
+                      elevation: 1.0,
+                      child: _overlayChild,
+                    ),
+              ),
+            ),
       );
     }
     return null;
@@ -314,26 +318,29 @@ class _GooglePlacesAutoCompleteTextFormFieldState
     return ListView.builder(
       padding: EdgeInsets.zero,
       shrinkWrap: true,
+      physics: widget.physics,
       itemCount: allPredictions.length,
-      itemBuilder: (BuildContext context, int index) => InkWell(
-        onTap: () {
-          if (index < allPredictions.length) {
-            widget.itmClick!(allPredictions[index]);
-            if (!widget.isLatLngRequired) return;
+      itemBuilder: (BuildContext context, int index) =>
+          InkWell(
+            onTap: () {
+              if (index < allPredictions.length) {
+                widget.itmClick!(allPredictions[index]);
+                if (!widget.isLatLngRequired) return;
 
-            getPlaceDetailsFromPlaceId(allPredictions[index]);
+                getPlaceDetailsFromPlaceId(allPredictions[index]);
 
-            removeOverlay();
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          child: Text(
-            allPredictions[index].description!,
-            style: widget.predictionsStyle ?? widget.style,
+                removeOverlay();
+              }
+            },
+            child: Container(
+              decoration: widget.suggestionDecoration,
+              padding: const EdgeInsets.all(10),
+              child: Text(
+                allPredictions[index].description!,
+                style: widget.predictionsStyle ?? widget.style,
+              ),
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -348,7 +355,8 @@ class _GooglePlacesAutoCompleteTextFormFieldState
     try {
       final prefix = widget.proxyURL ?? "";
       final url =
-          "${prefix}https://maps.googleapis.com/maps/api/place/details/json?placeid=${prediction.placeId}&key=${widget.googleAPIKey}";
+          "${prefix}https://maps.googleapis.com/maps/api/place/details/json?placeid=${prediction.placeId}&key=${widget
+          .googleAPIKey}";
       final response = await _dio.get(
         url,
       );
