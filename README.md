@@ -1,3 +1,4 @@
+```
 # google_places_autocomplete_text_field
 
 ## Add the dependency to pubspec.yml ➕
@@ -8,7 +9,6 @@ dependencies:
     sdk: flutter
   google_places_autocomplete_text_field: <last-version>
 
-```
 
 ## Integrate the Google AutoComplete TextField Widget in your code 🧩
 

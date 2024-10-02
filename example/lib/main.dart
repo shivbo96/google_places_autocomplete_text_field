@@ -33,13 +33,15 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final _yourGoogleAPIKey = 'foo-bar-baz';
+  final _yourGoogleAPIKey = '';
 
   // only needed if you build for the web
   final _yourProxyURL = 'https://your-proxy.com/';
 
   final _textController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<GooglePlacesAutoCompleteTextFormFieldState> _googleKey =
+      GlobalKey<GooglePlacesAutoCompleteTextFormFieldState>();
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
@@ -57,13 +59,18 @@ class _MyHomePageState extends State<MyHomePage> {
               key: _formKey,
               autovalidateMode: _autovalidateMode,
               child: GooglePlacesAutoCompleteTextFormField(
+                key: _googleKey,
                 textEditingController: _textController,
                 googleAPIKey: _yourGoogleAPIKey,
+                style: const TextStyle(color: Colors.white),
+                suggestionDecoration: const BoxDecoration(color: Color(0xFF161616)),
+                bottomSheetColor: const Color(0xFF161616),
+                showBottomSheet: false,
                 decoration: const InputDecoration(
+                  filled: true,
+                  fillColor: Color(0xFF161616),
                   hintText: 'Enter your address',
-                  labelText: 'Address',
-                  labelStyle: TextStyle(color: Colors.purple),
-                  border: OutlineInputBorder(),
+                  hintStyle: TextStyle(color: Colors.white),
                 ),
                 validator: (value) {
                   if (value!.isEmpty) {
@@ -73,17 +80,16 @@ class _MyHomePageState extends State<MyHomePage> {
                 },
                 // proxyURL: _yourProxyURL,
                 maxLines: 1,
-                overlayContainer: (child) => Material(
-                  elevation: 1.0,
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(12),
-                  child: child,
-                ),
+                // overlayContainer: (child) => Material(
+                //   elevation: 1.0,
+                //   color: Colors.green,
+                //   borderRadius: BorderRadius.circular(12),
+                //   child: child,
+                // ),
                 getPlaceDetailWithLatLng: (prediction) {
                   print('placeDetails${prediction.lng}');
                 },
-                itmClick: (Prediction prediction) =>
-                    _textController.text = prediction.description!,
+                itmClick: (Prediction prediction) => _textController.text = prediction.description!,
               ),
             ),
             const SizedBox(height: 24),
@@ -103,6 +109,6 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
 
-    print(_textController.text);
+    debugPrint(_textController.text);
   }
 }

@@ -58,6 +58,7 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
   final AutovalidateMode? autovalidateMode;
   final ScrollController? scrollController;
   final bool enableIMEPersonalizedLearning;
+  final bool showBottomSheet;
   final MouseCursor? mouseCursor;
   final EditableTextContextMenuBuilder? contextMenuBuilder;
   final String? Function(String?)? validator;
@@ -74,6 +75,7 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
   final String? proxyURL;
   final Decoration? suggestionDecoration;
   final ScrollPhysics? physics;
+  final Color? bottomSheetColor;
 
   const GooglePlacesAutoCompleteTextFormField({
     super.key,
@@ -91,6 +93,8 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
     this.proxyURL,
     this.suggestionDecoration,
     this.physics,
+    this.bottomSheetColor,
+    this.showBottomSheet = false,
 
     ////// DEFAULT TEXT FORM INPUTS
     this.initialValue,
@@ -145,11 +149,10 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
   });
 
   @override
-  State<GooglePlacesAutoCompleteTextFormField> createState() =>
-      _GooglePlacesAutoCompleteTextFormFieldState();
+  State<GooglePlacesAutoCompleteTextFormField> createState() => GooglePlacesAutoCompleteTextFormFieldState();
 }
 
-class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAutoCompleteTextFormField> {
+class GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAutoCompleteTextFormField> {
   final subject = PublishSubject<String>();
   OverlayEntry? _overlayEntry;
   List<Prediction> allPredictions = [];
@@ -160,12 +163,12 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
   final Dio _dio = Dio();
   late FocusNode _focus;
 
+  bool _bottomSheetVisible = false;
+  final ValueNotifier<bool> _isShowBottomSheetNotifier = ValueNotifier<bool>(false);
+
   @override
   void initState() {
-    subject.stream
-        .distinct()
-        .debounceTime(Duration(milliseconds: widget.debounceTime))
-        .listen(textChanged);
+    subject.stream.distinct().debounceTime(Duration(milliseconds: widget.debounceTime)).listen(textChanged);
 
     _focus = widget.focusNode ?? FocusNode();
 
@@ -178,6 +181,16 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
     }
 
     super.initState();
+  }
+
+  void openBottomSheet() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (timeStamp) {
+        if (!_bottomSheetVisible) {
+          _showBottomSheet();
+        }
+      },
+    );
   }
 
   @override
@@ -198,7 +211,7 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
         textAlign: widget.textAlign,
         textAlignVertical: widget.textAlignVertical,
         autofocus: widget.autofocus,
-        readOnly: widget.readOnly,
+        readOnly: (_bottomSheetVisible || widget.showBottomSheet) ? true : widget.readOnly,
         showCursor: widget.showCursor,
         obscuringCharacter: widget.obscuringCharacter,
         obscureText: widget.obscureText,
@@ -212,10 +225,23 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
         expands: widget.expands,
         maxLength: widget.maxLength,
         onChanged: (string) {
+          if (widget.showBottomSheet) {
+            widget.textEditingController.clear();
+            removeOverlay();
+            return;
+          }
           widget.onChanged?.call(string);
           subject.add(string);
         },
-        onTap: widget.onTap,
+        onTap: () {
+          if (widget.showBottomSheet) {
+            openBottomSheet();
+            widget.textEditingController.clear();
+            removeOverlay();
+            return;
+          }
+          widget.onTap?.call();
+        },
         onTapOutside: widget.onTapOutside,
         onEditingComplete: widget.onEditingComplete,
         onFieldSubmitted: widget.onFieldSubmitted,
@@ -260,9 +286,7 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
     }
 
     final response = await _dio.get(url);
-    final subscriptionResponse =
-    PlacesAutocompleteResponse.fromJson(response.data);
-
+    final subscriptionResponse = PlacesAutocompleteResponse.fromJson(response.data);
 
     if (text.isEmpty) {
       allPredictions.clear();
@@ -277,12 +301,25 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
     }
   }
 
-  Future<void> textChanged(String text) async =>
-      getLocation(text).then(
-            (_) {
-          _overlayEntry = null;
-          _overlayEntry = _createOverlayEntry();
-          Overlay.of(context).insert(_overlayEntry!);
+  double heightAccViewInsets(BuildContext context) {
+    double height;
+    if (MediaQuery.of(context).viewInsets.bottom != 0.0) {
+      height = MediaQuery.of(context).size.height * 0.50;
+    } else {
+      height = MediaQuery.of(context).size.height * 0.75;
+    }
+    return height;
+  }
+
+  Future<void> textChanged(String text) async => getLocation(text).then(
+        (_) {
+          if (!_bottomSheetVisible) {
+            _overlayEntry = null;
+            _overlayEntry = _createOverlayEntry();
+            Overlay.of(context).insert(_overlayEntry!);
+          } else {
+            _isShowBottomSheetNotifier.value = !_isShowBottomSheetNotifier.value;
+          }
         },
       );
 
@@ -293,22 +330,21 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
       var offset = renderBox.localToGlobal(Offset.zero);
 
       return OverlayEntry(
-        builder: (context) =>
-            Positioned(
-              left: offset.dx,
-              top: size.height + offset.dy,
-              width: size.width,
-              child: CompositedTransformFollower(
-                showWhenUnlinked: false,
-                link: _layerLink,
-                offset: Offset(0.0, size.height + 5.0),
-                child: widget.overlayContainer?.call(_overlayChild) ??
-                    Material(
-                      elevation: 1.0,
-                      child: _overlayChild,
-                    ),
-              ),
-            ),
+        builder: (context) => Positioned(
+          left: offset.dx,
+          top: size.height + offset.dy,
+          width: size.width,
+          child: CompositedTransformFollower(
+            showWhenUnlinked: false,
+            link: _layerLink,
+            offset: Offset(0.0, size.height + 5.0),
+            child: widget.overlayContainer?.call(_overlayChild) ??
+                Material(
+                  elevation: 1.0,
+                  child: _overlayChild,
+                ),
+          ),
+        ),
       );
     }
     return null;
@@ -320,16 +356,132 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
       shrinkWrap: true,
       physics: widget.physics,
       itemCount: allPredictions.length,
-      itemBuilder: (BuildContext context, int index) =>
-          InkWell(
+      itemBuilder: (BuildContext context, int index) => InkWell(
+        onTap: () {
+          if (index < allPredictions.length) {
+            widget.itmClick!(allPredictions[index]);
+            if (!widget.isLatLngRequired) return;
+
+            getPlaceDetailsFromPlaceId(allPredictions[index]);
+            removeOverlay();
+          }
+        },
+        child: Container(
+          decoration: widget.suggestionDecoration,
+          padding: const EdgeInsets.all(10),
+          child: Text(
+            allPredictions[index].description!,
+            style: widget.predictionsStyle ?? widget.style,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBottomSheet() {
+    _focus = FocusNode();
+    setState(() {
+      _bottomSheetVisible = true;
+    });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.bottomSheetColor,
+      showDragHandle: true,
+      constraints: BoxConstraints(maxHeight: heightAccViewInsets(context)),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: TextFormField(
+              controller: widget.textEditingController,
+              focusNode: _focus,
+              decoration: widget.decoration,
+              keyboardType: widget.keyboardType,
+              textCapitalization: widget.textCapitalization,
+              textInputAction: widget.textInputAction,
+              style: widget.style,
+              strutStyle: widget.strutStyle,
+              textDirection: widget.textDirection,
+              textAlign: widget.textAlign,
+              textAlignVertical: widget.textAlignVertical,
+              autofocus: widget.autofocus,
+              readOnly: widget.readOnly,
+              showCursor: widget.showCursor,
+              obscuringCharacter: widget.obscuringCharacter,
+              obscureText: widget.obscureText,
+              autocorrect: widget.autocorrect,
+              smartDashesType: widget.smartDashesType,
+              smartQuotesType: widget.smartQuotesType,
+              enableSuggestions: widget.enableSuggestions,
+              maxLengthEnforcement: widget.maxLengthEnforcement,
+              maxLines: widget.maxLines,
+              minLines: widget.minLines,
+              expands: widget.expands,
+              maxLength: widget.maxLength,
+              onChanged: (string) {
+                widget.onChanged?.call(string);
+                subject.add(string);
+              },
+              onTap: widget.onTap,
+              onTapOutside: widget.onTapOutside,
+              onEditingComplete: widget.onEditingComplete,
+              // onFieldSubmitted: widget.onFieldSubmitted,
+              onFieldSubmitted: (value) {
+                _overlayEntry!.remove();
+                widget.onFieldSubmitted;
+              },
+              inputFormatters: widget.inputFormatters,
+              enabled: widget.enabled,
+              cursorWidth: widget.cursorWidth,
+              cursorHeight: widget.cursorHeight,
+              cursorRadius: widget.cursorRadius,
+              cursorColor: widget.cursorColor,
+              keyboardAppearance: widget.keyboardAppearance,
+              scrollPadding: widget.scrollPadding,
+              enableInteractiveSelection: widget.enableInteractiveSelection,
+              selectionControls: widget.selectionControls,
+              buildCounter: widget.buildCounter,
+              scrollPhysics: widget.scrollPhysics,
+              autofillHints: widget.autofillHints,
+              autovalidateMode: widget.autovalidateMode,
+              scrollController: widget.scrollController,
+              enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
+              mouseCursor: widget.mouseCursor,
+              contextMenuBuilder: widget.contextMenuBuilder,
+              validator: widget.validator,
+            ),
+          ),
+          Expanded(child: _bottomSheetChild),
+        ],
+      ),
+    ).whenComplete(() {
+      setState(() {
+        _bottomSheetVisible = false;
+        _focus = widget.focusNode ?? FocusNode();
+      });
+    });
+  }
+
+  Widget get _bottomSheetChild {
+    return ValueListenableBuilder(
+      valueListenable: _isShowBottomSheetNotifier,
+      builder: (context, value, child) {
+        return ListView.builder(
+          padding: EdgeInsets.zero,
+          shrinkWrap: true,
+          physics: widget.physics,
+          itemCount: allPredictions.length,
+          itemBuilder: (BuildContext context, int index) => InkWell(
             onTap: () {
               if (index < allPredictions.length) {
                 widget.itmClick!(allPredictions[index]);
                 if (!widget.isLatLngRequired) return;
 
                 getPlaceDetailsFromPlaceId(allPredictions[index]);
-
                 removeOverlay();
+                Navigator.pop(context);
               }
             },
             child: Container(
@@ -341,7 +493,15 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
               ),
             ),
           ),
+        );
+      },
     );
+  }
+
+  void removeBottomSheet() {
+    if (_bottomSheetVisible) {
+      Navigator.pop(context);
+    }
   }
 
   void removeOverlay() {
@@ -355,8 +515,7 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
     try {
       final prefix = widget.proxyURL ?? "";
       final url =
-          "${prefix}https://maps.googleapis.com/maps/api/place/details/json?placeid=${prediction.placeId}&key=${widget
-          .googleAPIKey}";
+          "${prefix}https://maps.googleapis.com/maps/api/place/details/json?placeid=${prediction.placeId}&key=${widget.googleAPIKey}";
       final response = await _dio.get(
         url,
       );
@@ -376,10 +535,8 @@ class _GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAuto
 PlacesAutocompleteResponse parseResponse(Map responseBody) =>
     PlacesAutocompleteResponse.fromJson(responseBody as Map<String, dynamic>);
 
-PlaceDetails parsePlaceDetailMap(Map responseBody) =>
-    PlaceDetails.fromJson(responseBody as Map<String, dynamic>);
+PlaceDetails parsePlaceDetailMap(Map responseBody) => PlaceDetails.fromJson(responseBody as Map<String, dynamic>);
 
 typedef ItemClick = void Function(Prediction postalCodeResponse);
-typedef GetPlaceDetailswWithLatLng = void Function(
-    Prediction postalCodeResponse);
+typedef GetPlaceDetailswWithLatLng = void Function(Prediction postalCodeResponse);
 typedef OverlayContainer = Widget Function(Widget overlayChild);
