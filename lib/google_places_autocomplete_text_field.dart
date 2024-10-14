@@ -76,6 +76,8 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
   final Decoration? suggestionDecoration;
   final ScrollPhysics? physics;
   final Color? bottomSheetColor;
+  final PlaceType? placeType;
+  final String? language;
 
   const GooglePlacesAutoCompleteTextFormField({
     super.key,
@@ -95,6 +97,8 @@ class GooglePlacesAutoCompleteTextFormField extends StatefulWidget {
     this.physics,
     this.bottomSheetColor,
     this.showBottomSheet = false,
+    this.placeType,
+    this.language = 'en',
 
     ////// DEFAULT TEXT FORM INPUTS
     this.initialValue,
@@ -271,7 +275,7 @@ class GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAutoC
   Future<void> getLocation(String text) async {
     final prefix = widget.proxyURL ?? "";
     String url =
-        "${prefix}https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$text&key=${widget.googleAPIKey}";
+        "${prefix}https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$text&key=${widget.googleAPIKey}&language=${widget.language}";
 
     if (widget.countries != null) {
       for (int i = 0; i < widget.countries!.length; i++) {
@@ -283,6 +287,10 @@ class GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAutoC
           url = "$url|country:$country";
         }
       }
+    }
+
+    if (widget.placeType != null) {
+      url += "&types=${widget.placeType?.apiString}";
     }
 
     final response = await _dio.get(url);
@@ -530,6 +538,18 @@ class GooglePlacesAutoCompleteTextFormFieldState extends State<GooglePlacesAutoC
       rethrow;
     }
   }
+}
+
+class PlaceType {
+  final String apiString;
+
+  const PlaceType(this.apiString);
+
+  static const geocode = PlaceType("geocode");
+  static const address = PlaceType("address");
+  static const establishment = PlaceType("establishment");
+  static const region = PlaceType("(region)");
+  static const cities = PlaceType("(cities)");
 }
 
 PlacesAutocompleteResponse parseResponse(Map responseBody) =>
